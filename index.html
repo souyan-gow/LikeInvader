@@ -38,6 +38,28 @@ body{
              radial-gradient(130% 100% at 50% 50%,rgba(0,0,0,0) 60%,rgba(0,0,0,.55) 100%)}
 .screen:fullscreen{max-width:none;width:100vw;height:100vh;aspect-ratio:auto;border-radius:0}
 .screen:fullscreen canvas{object-fit:contain}
+.stage{display:grid;grid-template-columns:minmax(0,1fr);grid-template-areas:"screen";gap:12px;align-items:center}
+.stage .screen{grid-area:screen}
+.tpad{display:none;gap:10px;align-items:center}
+.tleft{grid-area:left}.tright{grid-area:right;justify-content:flex-end}
+.tbtn{touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+  min-width:64px;height:64px;border-radius:50%;font-size:22px;padding:0;border:2px solid var(--line);background:#0d0b18}
+.tbtn.on{border-color:var(--amber);color:var(--amber);background:#1d1830}
+.tfire{min-width:84px;height:84px;font-size:16px;border-color:var(--p2);color:var(--p2)}
+.tstart{min-width:0;height:36px;border-radius:999px;font-size:12px;padding:0 12px}
+body.touch .stage{grid-template-columns:1fr 1fr;grid-template-areas:"screen screen" "left right"}
+body.touch .tpad{display:flex}
+body.touch .screen,body.touch canvas,body.touch .stage{touch-action:none;user-select:none;-webkit-user-select:none}
+@media (orientation:landscape){
+  body.touch{padding-block:6px}
+  body.touch .wrap{grid-template-columns:minmax(0,1fr)}
+  body.touch .marquee{display:none}
+  body.touch .cabinet{padding:8px;border-radius:12px}
+  body.touch .stage{grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"left screen right"}
+  body.touch .tleft{flex-direction:column}
+  body.touch .tright{flex-direction:column-reverse}
+  body.touch .screen{max-width:calc((100dvh - 70px) * 4 / 3)}
+}
 .tools{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding-top:12px}
 button{font-family:var(--f-display);font-size:13px;color:var(--phosphor);background:transparent;border:1px solid var(--line);border-radius:8px;padding:6px 14px;cursor:pointer;letter-spacing:.06em}
 button:hover{border-color:var(--muted)}
@@ -67,7 +89,17 @@ kbd{font-family:var(--f-display);font-size:12px;border:1px solid var(--line);bor
       <h1>ほしぞら<span>防衛隊</span></h1>
       <div class="sub">1–4 PLAYER SCORE BATTLE</div>
     </div>
-    <div class="screen"><canvas id="screen" width="1280" height="960" aria-label="ゲーム画面"></canvas></div>
+    <div class="stage">
+      <div class="tpad tleft" aria-label="移動ボタン">
+        <button type="button" class="tbtn" data-k="left" aria-label="左へ移動">◀</button>
+        <button type="button" class="tbtn" data-k="right" aria-label="右へ移動">▶</button>
+      </div>
+      <div class="screen"><canvas id="screen" width="1280" height="960" aria-label="ゲーム画面"></canvas></div>
+      <div class="tpad tright" aria-label="発射と開始">
+        <button type="button" class="tbtn tstart" data-k="start">START</button>
+        <button type="button" class="tbtn tfire" data-k="fire">FIRE</button>
+      </div>
+    </div>
     <div class="tools">
       <button id="btnSound" type="button" aria-pressed="false">サウンド OFF</button>
       <button id="btnFull" type="button">全画面</button>
@@ -84,6 +116,7 @@ kbd{font-family:var(--f-display);font-size:12px;border:1px solid var(--line);bor
         <dt>発射</dt><dd><kbd>A</kbd> <kbd>X</kbd> <kbd>RB</kbd> <kbd>RT</kbd></dd>
         <dt>一時停止</dt><dd>プレイ中に <kbd>START</kbd></dd>
         <dt>抜ける</dt><dd>ロビーで <kbd>B</kbd></dd>
+        <dt>スマホ</dt><dd>画面の <kbd>FIRE</kbd> で参加、<kbd>START</kbd> で開始。横向きがおすすめ</dd>
       </dl>
       <p class="note">全員で同じ敵を撃ち、スコアで競います。弾は1人1発ずつ。残機がなくなった人は脱落、全員脱落か敵が地上に届いたら終了です。</p>
       <p class="note">ときどき敵やUFOからアイテムが落ちてきます。撃ち当てた人がゲット。<b style="color:var(--amber)">R</b> は12秒間の連射UP（同時3発）、<b style="color:var(--p3)">B</b> は敵弾を3発まで防ぐバリアです。</p>
@@ -215,6 +248,26 @@ const KB = {
   kbB:{left:['KeyA'], right:['KeyD'], fire:['KeyW'], label:'キーボードB'}
 };
 let padNow = [], padPrev = [];
+const touch = {left:false,right:false,fire:false,start:false};
+let touchPrev = {...touch}, touchEdge = {fire:false,start:false};
+let isTouch = false;
+function enableTouch(){ if (!isTouch){ isTouch = true; document.body.classList.add('touch'); } }
+try { if (matchMedia('(pointer:coarse)').matches) enableTouch(); } catch(e){}
+addEventListener('touchstart', enableTouch, {passive:true});
+document.querySelectorAll('.tbtn').forEach(btn=>{
+  const k = btn.dataset.k;
+  const down = e=>{ e.preventDefault(); touch[k] = true; btn.classList.add('on'); try{ btn.setPointerCapture(e.pointerId); }catch(_){} };
+  const up = e=>{ touch[k] = false; btn.classList.remove('on'); };
+  btn.addEventListener('pointerdown', down);
+  btn.addEventListener('pointerup', up);
+  btn.addEventListener('pointercancel', up);
+  btn.addEventListener('lostpointercapture', up);
+  btn.addEventListener('contextmenu', e=>e.preventDefault());
+});
+function pollTouch(){
+  touchEdge = {fire: touch.fire && !touchPrev.fire, start: touch.start && !touchPrev.start};
+  touchPrev = {...touch};
+}
 function pollPads(){
   padPrev = padNow; padNow = [];
   let list = [];
@@ -229,6 +282,7 @@ function pollPads(){
 }
 const padEdge = (i, k) => !!(padNow[i] && padNow[i][k] && !(padPrev[i] && padPrev[i][k]));
 function readDevice(dev){
+  if (dev.type === 'touch') return {left:touch.left, right:touch.right, fire:touch.fire};
   if (dev.type === 'pad'){
     const p = padNow[dev.index];
     if (!p) return {left:false,right:false,fire:false};
@@ -237,8 +291,8 @@ function readDevice(dev){
   const m = KB[dev.scheme], any = arr => arr.some(k=>keys.has(k));
   return {left:any(m.left), right:any(m.right), fire:any(m.fire)};
 }
-const sameDev = (a,b) => a && b && a.type===b.type && (a.type==='pad' ? a.index===b.index : a.scheme===b.scheme);
-const devLabel = d => d.type==='pad' ? `コントローラー${d.index+1}` : KB[d.scheme].label;
+const sameDev = (a,b) => a && b && a.type===b.type && (a.type==='pad' ? a.index===b.index : a.type==='touch' ? true : a.scheme===b.scheme);
+const devLabel = d => d.type==='pad' ? `コントローラー${d.index+1}` : d.type==='touch' ? 'タッチ操作' : KB[d.scheme].label;
 
 /* ---------- state ---------- */
 let hi = 0;
@@ -337,9 +391,9 @@ function aliveCount(){ let n=0; for(const a of aliens) if(a.alive) n++; return n
 
 /* ---------- update ---------- */
 function update(dt){
-  pollPads();
+  pollPads(); pollTouch();
   modeT += dt;
-  const startPressed = keyEdge.has('Enter') || padNow.some((p,i)=>p && padEdge(i,'start'));
+  const startPressed = keyEdge.has('Enter') || touchEdge.start || padNow.some((p,i)=>p && padEdge(i,'start'));
 
   if (mode === 'lobby'){
     padNow.forEach((p,i)=>{
@@ -350,6 +404,7 @@ function update(dt){
     if (keyEdge.has('Space') || keyEdge.has('ArrowUp')) joinSlot({type:'kb', scheme:'kbA'});
     if (keyEdge.has('KeyW')) joinSlot({type:'kb', scheme:'kbB'});
     if (keyEdge.has('Enter')) joinSlot({type:'kb', scheme:'kbA'});
+    if (touchEdge.fire || touchEdge.start) joinSlot({type:'touch'});
     if (keyEdge.has('Escape')) slots.fill(null);
     if (startPressed && slots.some(Boolean) && modeT > 0.3) startGame();
   }
@@ -648,16 +703,16 @@ function drawLobby(){
       text('READY', x+w/2, y+90, 14, col, 'center');
       text(devLabel(d), x+w/2, y+116, 12, '#8f8aab', 'center');
     } else {
-      if (Math.floor(clock*2)%2===0) text('Aボタンで参加', x+w/2, y+80, 13, '#8f8aab', 'center');
+      if (Math.floor(clock*2)%2===0) text(isTouch ? 'FIREで参加' : 'Aボタンで参加', x+w/2, y+80, 13, '#8f8aab', 'center');
     }
   }
   const n = slots.filter(Boolean).length;
   if (n){
-    if (Math.floor(clock*2.5)%2===0) text(`START ボタンで開始（${n}人）`, W/2, 368, 18, '#eaf5ee', 'center');
+    if (Math.floor(clock*2.5)%2===0) text(`START で開始（${n}人）`, W/2, 368, 18, '#eaf5ee', 'center');
   } else {
-    text('コントローラーの A ボタンを押してください', W/2, 368, 16, '#eaf5ee', 'center');
+    text(isTouch ? 'FIRE を押して参加してください' : 'コントローラーの A ボタンを押してください', W/2, 368, 16, '#eaf5ee', 'center');
   }
-  text('キーボード: Space で A、W で B が参加 ／ Enter で開始', W/2, 396, 12, '#8f8aab', 'center');
+  text(isTouch ? 'コントローラーをつなげば、スマホでも複数人で遊べます' : 'キーボード: Space で A、W で B が参加 ／ Enter で開始', W/2, 396, 12, '#8f8aab', 'center');
   text('得点   ' , W/2-150, 424, 12, '#8f8aab');
   drawSpr(SPR.A[0], ACOL.A, W/2-104, 424); text('30', W/2-78, 424, 12, '#eaf5ee');
   drawSpr(SPR.B[0], ACOL.B, W/2-44, 424);  text('20', W/2-18, 424, 12, '#eaf5ee');
@@ -684,7 +739,7 @@ function drawOver(){
     text(`撃墜 ${p.hits}`, W/2+140, y+6, 12, '#8f8aab');
   });
   if (results[0] && results[0].score >= hi && hi > 0) text('ハイスコア更新！', W/2, 372, 16, '#ffd23f', 'center');
-  if (modeT > 1.5 && Math.floor(clock*2.5)%2===0) text('START ボタンでロビーへ', W/2, 410, 16, '#eaf5ee', 'center');
+  if (modeT > 1.5 && Math.floor(clock*2.5)%2===0) text('START でロビーへ', W/2, 410, 16, '#eaf5ee', 'center');
 }
 
 function draw(){
@@ -693,7 +748,7 @@ function draw(){
   else if (mode === 'over') drawOver();
   else {
     drawPlay();
-    if (mode === 'paused'){ overlay(0.6); text('PAUSE', W/2, 190, 36, '#eaf5ee', 'center'); text('START ボタンで再開', W/2, 244, 14, '#8f8aab', 'center'); }
+    if (mode === 'paused'){ overlay(0.6); text('PAUSE', W/2, 190, 36, '#eaf5ee', 'center'); text('START で再開', W/2, 244, 14, '#8f8aab', 'center'); }
     if (mode === 'clear'){ text(`WAVE ${wave} CLEAR`, W/2, 200, 30, '#3dff8f', 'center'); text('次の編隊が接近中…', W/2, 246, 14, '#8f8aab', 'center'); }
     if (mode === 'play' && modeT < 1.6){ text(`WAVE ${wave}`, W/2, 300, 22, '#ff9f43', 'center'); }
   }
