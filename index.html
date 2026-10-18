@@ -1,0 +1,740 @@
+<title>ほしぞら防衛隊</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<style>
+/* Layout: arcade cabinet — one CRT screen centered on a dark bezel, control card beside it (stacks under on phones). Single dark theme on purpose. */
+:root{
+  --bg:#08070f;
+  --bezel:#151223;
+  --line:#2b2645;
+  --phosphor:#eaf5ee;
+  --muted:#8f8aab;
+  --amber:#ff9f43;
+  --p1:#3dff8f; --p2:#ff4f8b; --p3:#47c8ff; --p4:#ffd23f;
+  --f-display:"DotGothic16","Hiragino Kaku Gothic ProN","Yu Gothic",monospace;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{
+  background:radial-gradient(120% 80% at 50% 0%, #17132b 0%, var(--bg) 60%) var(--bg);
+  color:var(--phosphor);font-family:var(--f-body);font-size:14px;line-height:1.7;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:16px;box-sizing:border-box;
+}
+.wrap{max-width:1240px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:20px;align-items:start}
+@media (max-width:900px){.wrap{grid-template-columns:minmax(0,1fr)}}
+.cabinet{background:var(--bezel);border:1px solid var(--line);border-radius:18px;padding:14px;min-width:0}
+.marquee{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;padding:0 4px 10px}
+.marquee h1{font-family:var(--f-display);font-weight:400;font-size:clamp(20px,3vw,28px);margin:0;letter-spacing:.08em;text-wrap:balance}
+.marquee h1 span{color:var(--amber)}
+.marquee .sub{font-family:var(--f-display);color:var(--muted);font-size:12px;letter-spacing:.2em}
+.screen{position:relative;width:100%;max-width:calc((100dvh - 150px) * 4 / 3);min-width:0;margin:0 auto;aspect-ratio:4/3;border-radius:10px;overflow:hidden;background:#000;box-shadow:0 0 0 2px #000,0 0 40px rgba(71,200,255,.08) inset}
+.screen canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+.screen::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(to bottom,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.22) 2px 3px),
+             radial-gradient(130% 100% at 50% 50%,rgba(0,0,0,0) 60%,rgba(0,0,0,.55) 100%)}
+.screen:fullscreen{max-width:none;width:100vw;height:100vh;aspect-ratio:auto;border-radius:0}
+.screen:fullscreen canvas{object-fit:contain}
+.tools{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding-top:12px}
+button{font-family:var(--f-display);font-size:13px;color:var(--phosphor);background:transparent;border:1px solid var(--line);border-radius:8px;padding:6px 14px;cursor:pointer;letter-spacing:.06em}
+button:hover{border-color:var(--muted)}
+button:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+button[aria-pressed="true"]{border-color:var(--amber);color:var(--amber)}
+aside{display:grid;gap:14px;min-width:0}
+.card{background:var(--bezel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0}
+.card h2{font-family:var(--f-display);font-weight:400;font-size:15px;margin:0 0 8px;letter-spacing:.1em;color:var(--amber)}
+dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:0;font-size:13px}
+dt{color:var(--muted);white-space:nowrap}
+dd{margin:0}
+kbd{font-family:var(--f-display);font-size:12px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:#0d0b18}
+.pads{display:grid;gap:6px;font-size:12.5px;margin:0;padding:0;list-style:none}
+.pads li{display:flex;gap:8px;align-items:center;min-width:0}
+.pads .dot{width:9px;height:9px;border-radius:50%;flex:none;background:var(--line)}
+.pads .on .dot{background:var(--p1);box-shadow:0 0 6px var(--p1)}
+.pads .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+.pads .on .name{color:var(--phosphor)}
+.note{font-size:12px;color:var(--muted);margin:8px 0 0}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.chip{font-family:var(--f-display);font-size:12px;padding:1px 8px;border-radius:999px;border:1px solid currentColor}
+</style>
+
+<div class="wrap">
+  <section class="cabinet">
+    <div class="marquee">
+      <h1>ほしぞら<span>防衛隊</span></h1>
+      <div class="sub">1–4 PLAYER SCORE BATTLE</div>
+    </div>
+    <div class="screen"><canvas id="screen" width="1280" height="960" aria-label="ゲーム画面"></canvas></div>
+    <div class="tools">
+      <button id="btnSound" type="button" aria-pressed="false">サウンド OFF</button>
+      <button id="btnFull" type="button">全画面</button>
+    </div>
+  </section>
+
+  <aside>
+    <div class="card">
+      <h2>あそびかた</h2>
+      <dl>
+        <dt>参加</dt><dd>コントローラーの <kbd>A</kbd> を押す</dd>
+        <dt>開始</dt><dd><kbd>START</kbd>（全員そろったら）</dd>
+        <dt>移動</dt><dd>左スティック / 十字キー</dd>
+        <dt>発射</dt><dd><kbd>A</kbd> <kbd>X</kbd> <kbd>RB</kbd> <kbd>RT</kbd></dd>
+        <dt>一時停止</dt><dd>プレイ中に <kbd>START</kbd></dd>
+        <dt>抜ける</dt><dd>ロビーで <kbd>B</kbd></dd>
+      </dl>
+      <p class="note">全員で同じ敵を撃ち、スコアで競います。弾は1人1発ずつ。残機がなくなった人は脱落、全員脱落か敵が地上に届いたら終了です。</p>
+      <p class="note">ときどき敵やUFOからアイテムが落ちてきます。撃ち当てた人がゲット。<b style="color:var(--amber)">R</b> は12秒間の連射UP（同時3発）、<b style="color:var(--p3)">B</b> は敵弾を3発まで防ぐバリアです。</p>
+      <div class="chips" aria-hidden="true">
+        <span class="chip" style="color:var(--p1)">1P</span><span class="chip" style="color:var(--p2)">2P</span><span class="chip" style="color:var(--p3)">3P</span><span class="chip" style="color:var(--p4)">4P</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>キーボードでも参加</h2>
+      <dl>
+        <dt>キーボードA</dt><dd><kbd>←</kbd><kbd>→</kbd> 移動 / <kbd>Space</kbd> 発射</dd>
+        <dt>キーボードB</dt><dd><kbd>A</kbd><kbd>D</kbd> 移動 / <kbd>W</kbd> 発射</dd>
+        <dt>開始・一時停止</dt><dd><kbd>Enter</kbd></dd>
+        <dt>全員リセット</dt><dd>ロビーで <kbd>Esc</kbd></dd>
+      </dl>
+    </div>
+    <div class="card">
+      <h2>接続中のコントローラー</h2>
+      <ul class="pads" id="padList"></ul>
+      <p class="note">表示されないときは、コントローラーのボタンを一度押してください。ブラウザはボタン操作があるまでコントローラーを見せません。</p>
+    </div>
+  </aside>
+</div>
+
+<script>
+(() => {
+"use strict";
+const W = 640, H = 480;
+const cv = document.getElementById('screen');
+const ctx = cv.getContext('2d');
+ctx.setTransform(2,0,0,2,0,0);
+ctx.imageSmoothingEnabled = false;
+
+const PCOL = ['#3dff8f','#ff4f8b','#47c8ff','#ffd23f'];
+const FONT = '"DotGothic16", monospace';
+const GROUND = 450, PLAYER_Y = 424;
+
+/* ---------- sprites (original pixel art) ---------- */
+const SPR = {
+  A:[["...XXXX...",".XXXXXXXX.","XXX.XX.XXX","XXXXXXXXXX","..XX..XX..",".XX.XX.XX.","X........X",".........."],
+     ["...XXXX...",".XXXXXXXX.","XXX.XX.XXX","XXXXXXXXXX","..XX..XX..",".X..XX..X.","..X....X..",".........."]],
+  B:[["X..XXXX..X","X.XXXXXX.X","XXX.XX.XXX","XXXXXXXXXX",".XXXXXXXX.","..X....X..",".X......X.",".........."],
+     ["...XXXX...","..XXXXXX..","XXX.XX.XXX","XXXXXXXXXX","X.XXXXXX.X","X.X....X.X","...X..X...",".........."]],
+  C:[["....XX....","...XXXX...","..XXXXXX..",".XX.XX.XX.",".XXXXXXXX.","...X..X...","..X.XX.X..",".X.X..X.X."],
+     ["....XX....","...XXXX...","..XXXXXX..",".XX.XX.XX.",".XXXXXXXX.","..X.XX.X..",".X......X.","..X....X.."]],
+  cannon:["......X......",".....XXX.....",".....XXX.....",".XXXXXXXXXXX.","XXXXXXXXXXXXX","XXXXXXXXXXXXX","XXXXXXXXXXXXX"],
+  ufo:[".....XXXXXX.....","...XXXXXXXXXX...","..XXXXXXXXXXXX..",".XX.XX.XX.XX.XX.","XXXXXXXXXXXXXXXX","..XXX..XX..XXX..","...X........X..."],
+  boom:["X...X..X.X",".X..X.X..X","..X.....X.","XX........","........XX",".X.....X..","X..X.X..X.","X.X..X...X"],
+  pboom:["X....X..X....",".X.X....X.X..","...XX.X.X..X.","X.XXXXXXXX...",".XXXXXXXXXXX.","XXXXXXXXXXXXX","XXXXXXXXXXXXX"]
+};
+const ACOL = {A:'#d6c8ff', B:'#eef6f0', C:'#a8f0d8'};
+const ITEM_RATE = 0.07, RAPID_TIME = 12, SHIELD_MAX = 3;
+const ICOL = {R:'#ff9f43', S:'#47c8ff'};
+const ILETTER = {R:'R', S:'B'};
+const APTS = {A:30, B:20, C:10};
+const cache = new Map();
+function sprite(rows, color){
+  const key = rows.join('|') + color;
+  let c = cache.get(key);
+  if (c) return c;
+  c = document.createElement('canvas');
+  c.width = rows[0].length; c.height = rows.length;
+  const g = c.getContext('2d'); g.fillStyle = color;
+  rows.forEach((r,y)=>{ for(let x=0;x<r.length;x++) if(r[x]==='X') g.fillRect(x,y,1,1); });
+  cache.set(key, c); return c;
+}
+function drawSpr(rows, color, x, y){
+  const s = sprite(rows, color);
+  ctx.drawImage(s, Math.round(x), Math.round(y), s.width*2, s.height*2);
+}
+
+/* ---------- audio ---------- */
+let AC = null, soundOn = false;
+const btnSound = document.getElementById('btnSound');
+function setSound(on){
+  soundOn = on;
+  if (on){
+    try { if(!AC) AC = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){ AC = null; }
+    if (AC && AC.state === 'suspended') AC.resume().catch(()=>{});
+  }
+  btnSound.textContent = on ? 'サウンド ON' : 'サウンド OFF';
+  btnSound.setAttribute('aria-pressed', on ? 'true' : 'false');
+}
+btnSound.addEventListener('click', ()=> setSound(!soundOn));
+function tone(freq, dur, type='square', vol=0.06, slideTo=0){
+  if (!soundOn || !AC) return;
+  const t = AC.currentTime, o = AC.createOscillator(), g = AC.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t+dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+  o.connect(g).connect(AC.destination); o.start(t); o.stop(t+dur+0.02);
+}
+let noiseBuf = null;
+function noise(dur, vol=0.12){
+  if (!soundOn || !AC) return;
+  if (!noiseBuf){ noiseBuf = AC.createBuffer(1, AC.sampleRate*0.6, AC.sampleRate); const d = noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1; }
+  const t = AC.currentTime, s = AC.createBufferSource(), g = AC.createGain(), f = AC.createBiquadFilter();
+  s.buffer = noiseBuf; f.type='lowpass'; f.frequency.value = 1800;
+  g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  s.connect(f).connect(g).connect(AC.destination); s.start(t); s.stop(t+dur);
+}
+const sfx = {
+  shoot:()=>tone(880,0.09,'square',0.035,220),
+  hit:()=>{ noise(0.12,0.09); tone(300,0.1,'square',0.03,80); },
+  die:()=>{ noise(0.6,0.16); tone(160,0.5,'sawtooth',0.05,40); },
+  march:(i)=>tone([62,55,49,46][i%4],0.08,'square',0.07),
+  ufo:()=>tone(520,0.12,'sine',0.03,700),
+  ufoHit:()=>{ tone(1200,0.3,'square',0.04,300); noise(0.25,0.08); },
+  join:()=>tone(660,0.12,'square',0.05,990),
+  start:()=>{ [523,659,784,1046].forEach((f,i)=>setTimeout(()=>tone(f,0.12,'square',0.05),i*90)); },
+  item:()=>{ [988,1319,1760].forEach((f,i)=>setTimeout(()=>tone(f,0.08,'square',0.05),i*60)); },
+  shield:()=>{ tone(1400,0.15,'triangle',0.06,500); },
+  clear:()=>{ [784,988,1175].forEach((f,i)=>setTimeout(()=>tone(f,0.15,'triangle',0.06),i*120)); }
+};
+
+/* ---------- input ---------- */
+const keys = new Set(), keyEdge = new Set();
+const GAME_KEYS = ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space','Enter'];
+addEventListener('keydown', e=>{
+  if (GAME_KEYS.includes(e.code)) e.preventDefault();
+  if (!keys.has(e.code)) keyEdge.add(e.code);
+  keys.add(e.code);
+});
+addEventListener('keyup', e=> keys.delete(e.code));
+addEventListener('blur', ()=> keys.clear());
+
+const KB = {
+  kbA:{left:['ArrowLeft'], right:['ArrowRight'], fire:['Space','ArrowUp'], label:'キーボードA'},
+  kbB:{left:['KeyA'], right:['KeyD'], fire:['KeyW'], label:'キーボードB'}
+};
+let padNow = [], padPrev = [];
+function pollPads(){
+  padPrev = padNow; padNow = [];
+  let list = [];
+  try { list = navigator.getGamepads ? navigator.getGamepads() : []; } catch(e){ list = []; }
+  for (const p of list){
+    if (!p || !p.connected) continue;
+    const b = k => !!(p.buttons[k] && (p.buttons[k].pressed || p.buttons[k].value > 0.5));
+    const ax = p.axes[0] || 0;
+    padNow[p.index] = { id:p.id, left: ax < -0.35 || b(14), right: ax > 0.35 || b(15),
+      fire: b(0)||b(2)||b(5)||b(7), start: b(9), back: b(1) };
+  }
+}
+const padEdge = (i, k) => !!(padNow[i] && padNow[i][k] && !(padPrev[i] && padPrev[i][k]));
+function readDevice(dev){
+  if (dev.type === 'pad'){
+    const p = padNow[dev.index];
+    if (!p) return {left:false,right:false,fire:false};
+    return {left:p.left, right:p.right, fire:p.fire};
+  }
+  const m = KB[dev.scheme], any = arr => arr.some(k=>keys.has(k));
+  return {left:any(m.left), right:any(m.right), fire:any(m.fire)};
+}
+const sameDev = (a,b) => a && b && a.type===b.type && (a.type==='pad' ? a.index===b.index : a.scheme===b.scheme);
+const devLabel = d => d.type==='pad' ? `コントローラー${d.index+1}` : KB[d.scheme].label;
+
+/* ---------- state ---------- */
+let hi = 0;
+try { hi = parseInt(localStorage.getItem('hoshizora-hi')||'0',10) || 0; } catch(e){}
+const slots = [null,null,null,null];
+let mode = 'lobby', modeT = 0;
+let items = [];
+let players = [], aliens = [], bombs = [], bunkers = [], fx = [], texts = [];
+let form = {x:0,y:0,dir:1,frame:0,step:0,timer:0};
+let wave = 1, bombTimer = 1, ufo = null, ufoTimer = 18, ufoBeep = 0, results = [];
+const stars = Array.from({length:70},()=>({x:Math.random()*W,y:Math.random()*GROUND,p:Math.random()*6.28,s:Math.random()<0.15?2:1}));
+
+function joinSlot(dev){
+  if (slots.some(s=>sameDev(s,dev))) return false;
+  const i = slots.indexOf(null);
+  if (i < 0) return false;
+  slots[i] = dev; sfx.join(); return true;
+}
+
+/* bunkers: 22x16 cells, 2px each */
+const BW = 22, BH = 16;
+function makeBunkers(){
+  bunkers = [];
+  for (let i=0;i<4;i++){
+    const cells = new Uint8Array(BW*BH);
+    for (let y=0;y<BH;y++) for (let x=0;x<BW;x++){
+      let on = 1;
+      if (y < 4 && (x < 4-y || x > BW-1-(4-y))) on = 0;
+      const ex = (x - (BW-1)/2) / 5.5, ey = (y - BH) / 6;
+      if (ex*ex + ey*ey < 1) on = 0;
+      cells[y*BW+x] = on;
+    }
+    bunkers.push({x: Math.round(W*(i+1)/5 - BW), y: 372, cells});
+  }
+}
+function erode(b, cx, cy, r){
+  for (let y=cy-r;y<=cy+r;y++) for (let x=cx-r;x<=cx+r;x++){
+    if (x<0||y<0||x>=BW||y>=BH) continue;
+    if ((x-cx)**2+(y-cy)**2 <= r*r && Math.random() < 0.8) b.cells[y*BW+x] = 0;
+  }
+  b.cells[cy*BW+cx] = 0;
+}
+function bunkerHitLine(x, y0, y1, down){
+  const step = down ? 2 : -2;
+  for (let y=y0; down ? y<=y1 : y>=y1; y+=step){
+    for (const b of bunkers){
+      if (x>=b.x && x<b.x+BW*2 && y>=b.y && y<b.y+BH*2){
+        const cx = ((x-b.x)/2)|0, cy = ((y-b.y)/2)|0;
+        if (b.cells[cy*BW+cx]){ erode(b, cx, cy, down?3:2); return true; }
+      }
+    }
+  }
+  return false;
+}
+
+function buildWave(){
+  aliens = [];
+  for (let r=0;r<5;r++) for (let c=0;c<11;c++){
+    const t = r===0 ? 'A' : r<3 ? 'B' : 'C';
+    aliens.push({c, r, t, alive:true});
+  }
+  form = {x:(W-11*32)/2+6, y:72 + Math.min(wave-1,6)*12, dir:1, frame:0, step:0, timer:0.6};
+  bombs = []; ufo = null; ufoTimer = 15 + Math.random()*10;
+  bombTimer = 1.5;
+}
+const alienX = a => form.x + a.c*32;
+const alienY = a => form.y + a.r*28;
+
+function startGame(){
+  const joined = slots.map((d,i)=>d?i:-1).filter(i=>i>=0);
+  if (!joined.length) return;
+  players = joined.map((slot, k) => ({
+    slot, dev: slots[slot], color: PCOL[slot],
+    x: W*(k+1)/(joined.length+1) - 13, score:0, lives:3,
+    alive:true, out:false, respawn:0, inv:1.5, bullets:[], hits:0, rapid:0, cool:0, shield:0
+  }));
+  wave = 1; fx = []; texts = []; items = [];
+  makeBunkers(); buildWave();
+  mode = 'play'; modeT = 0; sfx.start();
+}
+
+function endGame(){
+  mode = 'over'; modeT = 0;
+  results = players.slice().sort((a,b)=>b.score-a.score);
+  const top = results[0] ? results[0].score : 0;
+  if (top > hi){ hi = top; try { localStorage.setItem('hoshizora-hi', String(hi)); } catch(e){} }
+}
+
+function grantItem(p, type){
+  if (type === 'R'){ p.rapid = RAPID_TIME; texts.push({x:p.x+13, y:PLAYER_Y-24, s:'連射UP', color:ICOL.R, t:1.4}); }
+  else { p.shield = SHIELD_MAX; texts.push({x:p.x+13, y:PLAYER_Y-24, s:'バリア', color:ICOL.S, t:1.4}); }
+  texts.push({x:p.x+13, y:PLAYER_Y-38, s:`${p.slot+1}P GET`, color:p.color, t:1.4});
+  sfx.item();
+}
+function aliveCount(){ let n=0; for(const a of aliens) if(a.alive) n++; return n; }
+
+/* ---------- update ---------- */
+function update(dt){
+  pollPads();
+  modeT += dt;
+  const startPressed = keyEdge.has('Enter') || padNow.some((p,i)=>p && padEdge(i,'start'));
+
+  if (mode === 'lobby'){
+    padNow.forEach((p,i)=>{
+      if (!p) return;
+      if (padEdge(i,'fire') || padEdge(i,'start')) joinSlot({type:'pad', index:i});
+      if (padEdge(i,'back')){ const s = slots.findIndex(d=>sameDev(d,{type:'pad',index:i})); if (s>=0) slots[s]=null; }
+    });
+    if (keyEdge.has('Space') || keyEdge.has('ArrowUp')) joinSlot({type:'kb', scheme:'kbA'});
+    if (keyEdge.has('KeyW')) joinSlot({type:'kb', scheme:'kbB'});
+    if (keyEdge.has('Enter')) joinSlot({type:'kb', scheme:'kbA'});
+    if (keyEdge.has('Escape')) slots.fill(null);
+    if (startPressed && slots.some(Boolean) && modeT > 0.3) startGame();
+  }
+  else if (mode === 'paused'){
+    if (startPressed || keyEdge.has('KeyP')) mode = 'play';
+  }
+  else if (mode === 'over'){
+    if (modeT > 1.5 && startPressed){ mode = 'lobby'; modeT = 0; }
+    updateFx(dt);
+  }
+  else if (mode === 'play' || mode === 'clear'){
+    if (mode === 'play' && (startPressed || keyEdge.has('KeyP'))){ mode = 'paused'; keyEdge.clear(); return; }
+    updatePlay(dt);
+  }
+  keyEdge.clear();
+}
+
+function updatePlay(dt){
+  const n = aliveCount();
+  // players
+  for (const p of players){
+    if (p.out) continue;
+    if (!p.alive){
+      p.respawn -= dt;
+      if (p.respawn <= 0 && mode === 'play'){ p.alive = true; p.inv = 2; }
+    } else {
+      p.inv = Math.max(0, p.inv - dt);
+      const inp = readDevice(p.dev);
+      const v = (inp.right?1:0) - (inp.left?1:0);
+      p.x = Math.max(8, Math.min(W-8-26, p.x + v*150*dt));
+      p.rapid = Math.max(0, p.rapid - dt);
+      p.cool = Math.max(0, p.cool - dt);
+      const maxB = p.rapid > 0 ? 3 : 1;
+      if (inp.fire && p.bullets.length < maxB && p.cool <= 0 && mode === 'play'){
+        p.bullets.push({x: p.x+13, y: PLAYER_Y-8});
+        p.cool = p.rapid > 0 ? 0.12 : 0;
+        sfx.shoot();
+      }
+    }
+    // bullets
+    for (let bi = p.bullets.length-1; bi >= 0; bi--){
+      const b = p.bullets[bi];
+      const y0 = b.y; b.y -= (p.rapid > 0 ? 520 : 420)*dt;
+      let gone = false;
+      for (let k=0;k<items.length;k++){
+        const it = items[k];
+        if (b.x >= it.x-2 && b.x <= it.x+18 && b.y <= it.y+14 && b.y+8 >= it.y){
+          items.splice(k,1); gone = true; grantItem(p, it.type); break;
+        }
+      }
+      if (!gone) for (const a of aliens){
+        if (!a.alive) continue;
+        const ax = alienX(a), ay = alienY(a);
+        if (b.x >= ax && b.x <= ax+20 && b.y <= ay+16 && b.y+8 >= ay){
+          a.alive = false; gone = true; p.score += APTS[a.t]; p.hits++;
+          fx.push({x:ax, y:ay, t:0.25, rows:SPR.boom, color:p.color});
+          if (Math.random() < ITEM_RATE) items.push({x:ax+2, y:ay, type: Math.random()<0.5?'R':'S', ph:0});
+          sfx.hit(); break;
+        }
+      }
+      if (!gone && ufo && b.x >= ufo.x && b.x <= ufo.x+32 && b.y <= 48 && b.y >= 34){
+        const pts = [50,100,150,300][Math.floor(Math.random()*4)];
+        p.score += pts; texts.push({x:ufo.x+16, y:42, s:String(pts), color:p.color, t:1.2});
+        fx.push({x:ufo.x+6, y:34, t:0.4, rows:SPR.boom, color:p.color});
+        items.push({x:ufo.x+8, y:40, type: Math.random()<0.5?'R':'S', ph:0});
+        ufo = null; gone = true; sfx.ufoHit();
+      }
+      if (!gone){
+        for (let i=0;i<bombs.length;i++){
+          const m = bombs[i];
+          if (Math.abs(m.x - b.x) < 4 && b.y <= m.y+8 && b.y+8 >= m.y){
+            bombs.splice(i,1); gone = true;
+            fx.push({x:b.x-10, y:b.y-6, t:0.15, rows:SPR.boom, color:'#ffffff'}); break;
+          }
+        }
+      }
+      if (!gone && bunkerHitLine(Math.round(b.x), Math.round(y0), Math.round(b.y), false)) gone = true;
+      if (!gone && b.y < 22){ gone = true; fx.push({x:b.x-10, y:22, t:0.15, rows:SPR.boom, color:p.color}); }
+      if (gone) p.bullets.splice(bi,1);
+    }
+  }
+
+  // falling items
+  for (let i=items.length-1;i>=0;i--){
+    const it = items[i]; it.y += 55*dt; it.ph += dt;
+    if (it.y > GROUND - 14){ items.splice(i,1); }
+  }
+
+  if (mode === 'clear'){
+    updateFx(dt);
+    if (modeT > 2.2){ wave++; makeBunkers(); buildWave(); mode = 'play'; modeT = 0; for (const p of players) p.bullets = []; items = []; }
+    return;
+  }
+
+  // formation march
+  const speed = Math.max(0.5, 1 - 0.07*(wave-1));
+  form.timer -= dt;
+  if (form.timer <= 0 && n > 0){
+    form.timer = (0.018 + 0.62*(n/55)) * speed;
+    let minX = Infinity, maxX = -Infinity;
+    for (const a of aliens) if (a.alive){ const x = alienX(a); minX = Math.min(minX, x); maxX = Math.max(maxX, x+20); }
+    if ((form.dir > 0 && maxX + 6 > W-10) || (form.dir < 0 && minX - 6 < 10)){
+      form.y += 14; form.dir *= -1;
+    } else form.x += 6*form.dir;
+    form.frame ^= 1; sfx.march(form.step++);
+    // aliens chew through bunkers
+    for (const a of aliens){
+      if (!a.alive) continue;
+      const ax = alienX(a), ay = alienY(a);
+      for (const bk of bunkers){
+        if (ax+20 < bk.x || ax > bk.x+BW*2 || ay+16 < bk.y || ay > bk.y+BH*2) continue;
+        for (let y=0;y<BH;y++) for (let x=0;x<BW;x++){
+          const px = bk.x+x*2, py = bk.y+y*2;
+          if (px>=ax && px<ax+20 && py>=ay && py<ay+16) bk.cells[y*BW+x] = 0;
+        }
+      }
+      if (ay + 16 >= PLAYER_Y){
+        for (const p of players){ if (p.alive){ fx.push({x:p.x, y:PLAYER_Y, t:1, rows:SPR.pboom, color:p.color}); } p.alive=false; p.out=true; }
+        sfx.die(); endGame(); return;
+      }
+    }
+  }
+
+  // alien bombs
+  const living = players.filter(p=>!p.out).length;
+  bombTimer -= dt;
+  if (bombTimer <= 0 && n > 0){
+    bombTimer = (0.35 + Math.random()*0.8) / (0.7 + 0.22*living) * speed;
+    if (bombs.length < 3 + living){
+      const cols = {};
+      for (const a of aliens) if (a.alive && (!cols[a.c] || a.r > cols[a.c].r)) cols[a.c] = a;
+      const shooters = Object.values(cols);
+      let pick = shooters[Math.floor(Math.random()*shooters.length)];
+      const targets = players.filter(p=>p.alive);
+      if (targets.length && Math.random() < 0.45){
+        const tg = targets[Math.floor(Math.random()*targets.length)];
+        pick = shooters.reduce((best,a)=>Math.abs(alienX(a)+10-tg.x-13) < Math.abs(alienX(best)+10-tg.x-13) ? a : best, pick);
+      }
+      if (pick) bombs.push({x: alienX(pick)+10, y: alienY(pick)+16, vy: 130 + 12*Math.min(wave,10), ph:0});
+    }
+  }
+  for (let i=bombs.length-1;i>=0;i--){
+    const m = bombs[i]; const y0 = m.y;
+    m.y += m.vy*dt; m.ph += dt*12;
+    let gone = false;
+    if (bunkerHitLine(Math.round(m.x), Math.round(y0+8), Math.round(m.y+8), true)) gone = true;
+    if (!gone){
+      for (const p of players){
+        if (!p.alive || p.inv > 0) continue;
+        if (m.x >= p.x && m.x <= p.x+26 && m.y+8 >= PLAYER_Y && m.y <= PLAYER_Y+14){
+          gone = true;
+          if (p.shield > 0){
+            p.shield--; sfx.shield();
+            fx.push({x:m.x-10, y:PLAYER_Y-14, t:0.18, rows:SPR.boom, color:ICOL.S});
+            break;
+          }
+          p.alive = false; p.lives--; p.bullets = []; p.rapid = 0;
+          fx.push({x:p.x, y:PLAYER_Y, t:1, rows:SPR.pboom, color:p.color});
+          sfx.die();
+          if (p.lives <= 0) p.out = true; else p.respawn = 1.8;
+          break;
+        }
+      }
+    }
+    if (!gone && m.y+8 >= GROUND){ gone = true; fx.push({x:m.x-10, y:GROUND-12, t:0.2, rows:SPR.boom, color:'#ff9f43'}); }
+    if (gone) bombs.splice(i,1);
+  }
+
+  // UFO
+  if (ufo){
+    ufo.x += ufo.vx*dt;
+    ufoBeep -= dt; if (ufoBeep <= 0){ ufoBeep = 0.16; sfx.ufo(); }
+    if (ufo.x < -40 || ufo.x > W+40) ufo = null;
+  } else if (n > 8){
+    ufoTimer -= dt;
+    if (ufoTimer <= 0){
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      ufo = {x: dir>0 ? -32 : W, vx: 75*dir};
+      ufoTimer = 18 + Math.random()*12;
+    }
+  }
+
+  updateFx(dt);
+
+  if (players.every(p=>p.out)){ endGame(); return; }
+  if (n === 0){ mode = 'clear'; modeT = 0; bombs = []; ufo = null; sfx.clear(); }
+}
+
+function updateFx(dt){
+  for (let i=fx.length-1;i>=0;i--){ fx[i].t -= dt; if (fx[i].t <= 0) fx.splice(i,1); }
+  for (let i=texts.length-1;i>=0;i--){ texts[i].t -= dt; texts[i].y -= 12*dt; if (texts[i].t <= 0) texts.splice(i,1); }
+}
+
+/* ---------- draw ---------- */
+function text(s, x, y, size, color, align='left'){
+  ctx.font = `${size}px ${FONT}`; ctx.fillStyle = color; ctx.textAlign = align; ctx.textBaseline = 'top';
+  ctx.fillText(s, x, y);
+}
+const pad5 = n => String(n).padStart(5,'0');
+let clock = 0;
+
+function drawStars(){
+  for (const s of stars){
+    const a = 0.25 + 0.25*Math.sin(clock*1.5 + s.p);
+    ctx.fillStyle = `rgba(200,210,255,${a})`;
+    ctx.fillRect(s.x, s.y, s.s, s.s);
+  }
+}
+
+function drawHUD(){
+  for (let i=0;i<4;i++){
+    const x = 12 + i*157;
+    const p = players.find(q=>q.slot===i);
+    if (!p){ text(`${i+1}P  -----`, x, 6, 14, '#3a3555'); continue; }
+    text(`${i+1}P`, x, 6, 14, p.color);
+    text(pad5(p.score), x+30, 6, 14, p.out ? '#6b6788' : '#eaf5ee');
+    for (let l=0;l<Math.max(0,p.lives - (p.alive?1:0));l++){
+      ctx.fillStyle = p.color; ctx.fillRect(x+90+l*12, 10, 8, 6); ctx.fillRect(x+93+l*12, 7, 2, 3);
+    }
+    if (p.out) text('OUT', x+90, 6, 12, '#ff4f8b');
+  }
+  ctx.fillStyle = '#2b2645'; ctx.fillRect(0, 26, W, 1);
+  ctx.fillStyle = '#3dff8f'; ctx.fillRect(0, GROUND, W, 2);
+  text(`WAVE ${wave}`, 12, 464, 12, '#8f8aab');
+  text(`HI ${pad5(hi)}`, W-12, 464, 12, '#8f8aab', 'right');
+}
+
+function drawPlay(){
+  drawStars();
+  // bunkers
+  ctx.fillStyle = '#ff9f43';
+  for (const b of bunkers) for (let y=0;y<BH;y++) for (let x=0;x<BW;x++) if (b.cells[y*BW+x]) ctx.fillRect(b.x+x*2, b.y+y*2, 2, 2);
+  // aliens
+  for (const a of aliens) if (a.alive) drawSpr(SPR[a.t][form.frame], ACOL[a.t], alienX(a), alienY(a));
+  if (ufo) drawSpr(SPR.ufo, '#ff4f8b', ufo.x, 34);
+  // bombs
+  ctx.fillStyle = '#eaf5ee';
+  for (const m of bombs){
+    const o = Math.floor(m.ph) % 2 ? 1 : -1;
+    ctx.fillRect(m.x-1, m.y, 2, 2); ctx.fillRect(m.x-1+o, m.y+2, 2, 2);
+    ctx.fillRect(m.x-1, m.y+4, 2, 2); ctx.fillRect(m.x-1-o, m.y+6, 2, 2);
+  }
+  // players
+  for (const p of players){
+    ctx.fillStyle = p.color;
+    for (const b of p.bullets) ctx.fillRect(b.x-1, b.y, 2, 8);
+    if (!p.alive) continue;
+    if (p.inv > 0 && Math.floor(clock*12)%2) continue;
+    drawSpr(SPR.cannon, p.color, p.x, PLAYER_Y);
+    if (p.shield > 0) drawShield(p);
+    if (p.rapid > 0){
+      const w = 26 * (p.rapid / RAPID_TIME);
+      ctx.fillStyle = (p.rapid < 3 && Math.floor(clock*8)%2) ? '#3a3555' : ICOL.R;
+      ctx.fillRect(p.x, PLAYER_Y+16, w, 2);
+    }
+    text(`${p.slot+1}P`, p.x+13, GROUND+3, 10, p.color, 'center');
+  }
+  for (const it of items) drawItem(it);
+  for (const f of fx) drawSpr(f.rows, f.color, f.x, f.y);
+  for (const t of texts) text(t.s, t.x, t.y, 12, t.color, 'center');
+  drawHUD();
+}
+
+function drawShield(p){
+  const cx = p.x+13, cy = PLAYER_Y+10;
+  ctx.strokeStyle = ICOL.S; ctx.lineWidth = 2;
+  ctx.globalAlpha = 0.45 + 0.2*p.shield + 0.1*Math.sin(clock*10);
+  ctx.beginPath(); ctx.arc(cx, cy, 20, Math.PI*1.08, Math.PI*1.92); ctx.stroke();
+  ctx.globalAlpha = 1;
+  for (let i=0;i<p.shield;i++){ ctx.fillStyle = ICOL.S; ctx.fillRect(cx-8+i*6, cy-24, 4, 2); }
+}
+function drawItem(it){
+  const col = ICOL[it.type];
+  const blink = Math.floor(it.ph*6)%2;
+  ctx.fillStyle = '#000'; ctx.fillRect(it.x, it.y, 16, 14);
+  ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.strokeRect(it.x+1, it.y+1, 14, 12);
+  text(ILETTER[it.type], it.x+8, it.y-1, 12, blink ? '#eaf5ee' : col, 'center');
+}
+function drawLobby(){
+  drawStars();
+  text('ほしぞら防衛隊', W/2, 58, 40, '#eaf5ee', 'center');
+  text('1–4 PLAYER SCORE BATTLE', W/2, 108, 14, '#ff9f43', 'center');
+  // sample formation
+  for (let c=0;c<6;c++){
+    const t = ['A','B','C'][c%3];
+    drawSpr(SPR[t][Math.floor(clock*2)%2], ACOL[t], W/2-100+c*34, 140);
+  }
+  for (let i=0;i<4;i++){
+    const x = 22 + i*152, y = 188, w = 140, h = 150;
+    const d = slots[i], col = PCOL[i];
+    ctx.strokeStyle = d ? col : '#2b2645'; ctx.lineWidth = 2;
+    ctx.strokeRect(x+1, y+1, w-2, h-2);
+    text(`${i+1}P`, x+w/2, y+12, 26, d ? col : '#3a3555', 'center');
+    if (d){
+      drawSpr(SPR.cannon, col, x+w/2-13, y+62);
+      text('READY', x+w/2, y+90, 14, col, 'center');
+      text(devLabel(d), x+w/2, y+116, 12, '#8f8aab', 'center');
+    } else {
+      if (Math.floor(clock*2)%2===0) text('Aボタンで参加', x+w/2, y+80, 13, '#8f8aab', 'center');
+    }
+  }
+  const n = slots.filter(Boolean).length;
+  if (n){
+    if (Math.floor(clock*2.5)%2===0) text(`START ボタンで開始（${n}人）`, W/2, 368, 18, '#eaf5ee', 'center');
+  } else {
+    text('コントローラーの A ボタンを押してください', W/2, 368, 16, '#eaf5ee', 'center');
+  }
+  text('キーボード: Space で A、W で B が参加 ／ Enter で開始', W/2, 396, 12, '#8f8aab', 'center');
+  text('得点   ' , W/2-150, 424, 12, '#8f8aab');
+  drawSpr(SPR.A[0], ACOL.A, W/2-104, 424); text('30', W/2-78, 424, 12, '#eaf5ee');
+  drawSpr(SPR.B[0], ACOL.B, W/2-44, 424);  text('20', W/2-18, 424, 12, '#eaf5ee');
+  drawSpr(SPR.C[0], ACOL.C, W/2+16, 424);  text('10', W/2+42, 424, 12, '#eaf5ee');
+  drawSpr(SPR.ufo, '#ff4f8b', W/2+74, 425); text('???', W/2+112, 424, 12, '#eaf5ee');
+  drawItem({x:W/2-150, y:448, type:'R', ph:0}); text('連射UP（12秒）', W/2-128, 448, 12, '#eaf5ee');
+  drawItem({x:W/2+20, y:448, type:'S', ph:0}); text('バリア（3発まで防ぐ）', W/2+42, 448, 12, '#eaf5ee');
+  text(`HI ${pad5(hi)}`, W-12, 464, 12, '#8f8aab', 'right');
+}
+
+function overlay(alpha=0.6){ ctx.fillStyle = `rgba(8,7,15,${alpha})`; ctx.fillRect(0,0,W,H); }
+
+function drawOver(){
+  drawPlay(); overlay(0.72);
+  text('GAME OVER', W/2, 70, 40, '#ff4f8b', 'center');
+  text(`WAVE ${wave} まで到達`, W/2, 120, 14, '#8f8aab', 'center');
+  results.forEach((p,i)=>{
+    const y = 168 + i*48;
+    const win = i===0 && results.length>1;
+    text(`${i+1}位`, W/2-170, y, 22, win ? '#ffd23f' : '#8f8aab');
+    drawSpr(SPR.cannon, p.color, W/2-100, y+4);
+    text(`${p.slot+1}P`, W/2-62, y, 22, p.color);
+    text(pad5(p.score), W/2+120, y, 22, '#eaf5ee', 'right');
+    text(`撃墜 ${p.hits}`, W/2+140, y+6, 12, '#8f8aab');
+  });
+  if (results[0] && results[0].score >= hi && hi > 0) text('ハイスコア更新！', W/2, 372, 16, '#ffd23f', 'center');
+  if (modeT > 1.5 && Math.floor(clock*2.5)%2===0) text('START ボタンでロビーへ', W/2, 410, 16, '#eaf5ee', 'center');
+}
+
+function draw(){
+  ctx.fillStyle = '#000'; ctx.fillRect(0,0,W,H);
+  if (mode === 'lobby') drawLobby();
+  else if (mode === 'over') drawOver();
+  else {
+    drawPlay();
+    if (mode === 'paused'){ overlay(0.6); text('PAUSE', W/2, 190, 36, '#eaf5ee', 'center'); text('START ボタンで再開', W/2, 244, 14, '#8f8aab', 'center'); }
+    if (mode === 'clear'){ text(`WAVE ${wave} CLEAR`, W/2, 200, 30, '#3dff8f', 'center'); text('次の編隊が接近中…', W/2, 246, 14, '#8f8aab', 'center'); }
+    if (mode === 'play' && modeT < 1.6){ text(`WAVE ${wave}`, W/2, 300, 22, '#ff9f43', 'center'); }
+  }
+}
+
+/* ---------- loop ---------- */
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(0.05, (now - last)/1000); last = now; clock += dt;
+  update(dt); draw();
+  requestAnimationFrame(frame);
+}
+const boot = () => requestAnimationFrame(t=>{ last = t; frame(t); });
+if (document.fonts && document.fonts.load){
+  Promise.race([document.fonts.load(`16px ${FONT}`), new Promise(r=>setTimeout(r,1500))]).then(boot, boot);
+} else boot();
+
+/* ---------- side panel ---------- */
+const padList = document.getElementById('padList');
+function renderPads(){
+  let list = [];
+  try { list = navigator.getGamepads ? Array.from(navigator.getGamepads()) : []; } catch(e){}
+  const html = [0,1,2,3].map(i=>{
+    const p = list[i];
+    const on = p && p.connected;
+    const name = on ? p.id.replace(/\(.*?\)/g,'').trim() || 'Gamepad' : '未接続';
+    return `<li class="${on?'on':''}"><span class="dot"></span><span>${i+1}</span><span class="name"></span></li>`.replace('<span class="name"></span>', `<span class="name">${name.replace(/[&<>]/g,'')}</span>`);
+  }).join('');
+  if (padList.innerHTML !== html) padList.innerHTML = html;
+}
+renderPads();
+setInterval(renderPads, 1000);
+addEventListener('gamepadconnected', renderPads);
+addEventListener('gamepaddisconnected', renderPads);
+
+document.getElementById('btnFull').addEventListener('click', ()=>{
+  const el = document.querySelector('.screen');
+  try {
+    const r = document.fullscreenElement ? document.exitFullscreen() : el.requestFullscreen();
+    if (r && r.catch) r.catch(()=>{});
+  } catch(e){}
+});
+})();
+</script>
