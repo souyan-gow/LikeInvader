@@ -1,3 +1,12 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08070f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;-webkit-text-size-adjust:100%}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>ほしぞら防衛隊</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -50,6 +59,22 @@ body{
 body.touch .stage{grid-template-columns:1fr 1fr;grid-template-areas:"screen screen" "left right"}
 body.touch .tpad{display:flex}
 body.touch .screen,body.touch canvas,body.touch .stage{touch-action:none;user-select:none;-webkit-user-select:none}
+body.touch .kbcard{display:none}
+@media (orientation:portrait){
+  body.touch{padding-block:10px}
+  body.touch .cabinet{padding:0;background:transparent;border:0}
+  body.touch .marquee{padding:0 2px 8px}
+  body.touch .marquee h1{font-size:22px}
+  body.touch .marquee .sub{display:none}
+  body.touch .screen{max-width:none;border-radius:8px}
+  body.touch .stage{grid-template-columns:1fr auto;gap:18px 12px;padding-top:4px}
+  body.touch .tleft{gap:14px}
+  body.touch .tleft .tbtn{min-width:78px;height:78px;font-size:26px}
+  body.touch .tright{gap:14px}
+  body.touch .tfire{min-width:108px;height:108px;font-size:20px}
+  body.touch .tools{padding-top:16px}
+  body.touch aside{margin-top:8px}
+}
 @media (orientation:landscape){
   body.touch{padding-block:6px}
   body.touch .wrap{grid-template-columns:minmax(0,1fr)}
@@ -82,7 +107,8 @@ kbd{font-family:var(--f-display);font-size:12px;border:1px solid var(--line);bor
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
 .chip{font-family:var(--f-display);font-size:12px;padding:1px 8px;border-radius:999px;border:1px solid currentColor}
 </style>
-
+</head>
+<body>
 <div class="wrap">
   <section class="cabinet">
     <div class="marquee">
@@ -124,7 +150,7 @@ kbd{font-family:var(--f-display);font-size:12px;border:1px solid var(--line);bor
         <span class="chip" style="color:var(--p1)">1P</span><span class="chip" style="color:var(--p2)">2P</span><span class="chip" style="color:var(--p3)">3P</span><span class="chip" style="color:var(--p4)">4P</span>
       </div>
     </div>
-    <div class="card">
+    <div class="card kbcard">
       <h2>キーボードでも参加</h2>
       <dl>
         <dt>キーボードA</dt><dd><kbd>←</kbd><kbd>→</kbd> 移動 / <kbd>Space</kbd> 発射</dd>
@@ -599,7 +625,10 @@ function updateFx(dt){
 }
 
 /* ---------- draw ---------- */
+let uiScale = 1;
+function updateUiScale(){ uiScale = (isTouch || cv.clientWidth < 560) ? 1.35 : 1; }
 function text(s, x, y, size, color, align='left'){
+  if (size < 20) size = Math.round(size * uiScale);
   ctx.font = `${size}px ${FONT}`; ctx.fillStyle = color; ctx.textAlign = align; ctx.textBaseline = 'top';
   ctx.fillText(s, x, y);
 }
@@ -660,7 +689,7 @@ function drawPlay(){
       ctx.fillStyle = (p.rapid < 3 && Math.floor(clock*8)%2) ? '#3a3555' : ICOL.R;
       ctx.fillRect(p.x, PLAYER_Y+16, w, 2);
     }
-    text(`${p.slot+1}P`, p.x+13, GROUND+3, 10, p.color, 'center');
+    text(`${p.slot+1}P`, p.x+13, GROUND+2, 10, p.color, 'center');
   }
   for (const it of items) drawItem(it);
   for (const f of fx) drawSpr(f.rows, f.color, f.x, f.y);
@@ -758,7 +787,7 @@ function draw(){
 let last = performance.now();
 function frame(now){
   const dt = Math.min(0.05, (now - last)/1000); last = now; clock += dt;
-  update(dt); draw();
+  updateUiScale(); update(dt); draw();
   requestAnimationFrame(frame);
 }
 const boot = () => requestAnimationFrame(t=>{ last = t; frame(t); });
@@ -793,3 +822,5 @@ document.getElementById('btnFull').addEventListener('click', ()=>{
 });
 })();
 </script>
+</body>
+</html>
