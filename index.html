@@ -142,10 +142,12 @@ kbd{font-family:var(--f-display);font-size:12px;border:1px solid var(--line);bor
         <dt>発射</dt><dd><kbd>A</kbd> <kbd>X</kbd> <kbd>RB</kbd> <kbd>RT</kbd></dd>
         <dt>一時停止</dt><dd>プレイ中に <kbd>START</kbd></dd>
         <dt>抜ける</dt><dd>ロビーで <kbd>B</kbd></dd>
+        <dt>モード</dt><dd>ロビーで左右を押してノーマル / ハードを切替</dd>
         <dt>スマホ</dt><dd>画面の <kbd>FIRE</kbd> で参加、<kbd>START</kbd> で開始。横向きがおすすめ</dd>
       </dl>
       <p class="note">全員で同じ敵を撃ち、スコアで競います。弾は1人1発ずつ。残機がなくなった人は脱落、全員脱落か敵が地上に届いたら終了です。</p>
-      <p class="note">ときどき敵やUFOからアイテムが落ちてきます。撃ち当てた人がゲット。<b style="color:var(--amber)">R</b> は12秒間の連射UP（同時3発）、<b style="color:var(--p3)">B</b> は敵弾を3発まで防ぐバリアです。</p>
+      <p class="note">ときどき敵やUFOからアイテムが落ちてきます。撃ち当てた人がゲット。<b style="color:var(--amber)">R</b> は連射UP（同時3発、1個で+12秒・最大36秒）、<b style="color:var(--p3)">B</b> はバリア（1個で+3発・最大9発）。重ねて取るほど効果が積み上がります。</p>
+      <p class="note">ハードモードでは、25秒以内に編隊を倒しきれないと空いた場所に援軍が飛んできます。画面下の「援軍まで」の数字に注意。</p>
       <div class="chips" aria-hidden="true">
         <span class="chip" style="color:var(--p1)">1P</span><span class="chip" style="color:var(--p2)">2P</span><span class="chip" style="color:var(--p3)">3P</span><span class="chip" style="color:var(--p4)">4P</span>
       </div>
@@ -195,6 +197,8 @@ const SPR = {
 };
 const ACOL = {A:'#d6c8ff', B:'#eef6f0', C:'#a8f0d8'};
 const ITEM_RATE = 0.07, RAPID_TIME = 12, SHIELD_MAX = 3;
+const RAPID_CAP = 36, SHIELD_CAP = 9;
+const REINF_INTERVAL = 25, REINF_COUNT = 11;
 const ICOL = {R:'#ff9f43', S:'#47c8ff'};
 const ILETTER = {R:'R', S:'B'};
 const APTS = {A:30, B:20, C:10};
@@ -254,6 +258,8 @@ const sfx = {
   join:()=>tone(660,0.12,'square',0.05,990),
   start:()=>{ [523,659,784,1046].forEach((f,i)=>setTimeout(()=>tone(f,0.12,'square',0.05),i*90)); },
   item:()=>{ [988,1319,1760].forEach((f,i)=>setTimeout(()=>tone(f,0.08,'square',0.05),i*60)); },
+  siren:()=>{ [0,1,2].forEach(i=>setTimeout(()=>tone(440,0.18,'sawtooth',0.04,880),i*220)); },
+  tick:()=>tone(1200,0.04,'square',0.03),
   shield:()=>{ tone(1400,0.15,'triangle',0.06,500); },
   clear:()=>{ [784,988,1175].forEach((f,i)=>setTimeout(()=>tone(f,0.15,'triangle',0.06),i*120)); }
 };
@@ -291,7 +297,8 @@ document.querySelectorAll('.tbtn').forEach(btn=>{
   btn.addEventListener('contextmenu', e=>e.preventDefault());
 });
 function pollTouch(){
-  touchEdge = {fire: touch.fire && !touchPrev.fire, start: touch.start && !touchPrev.start};
+  touchEdge = {fire: touch.fire && !touchPrev.fire, start: touch.start && !touchPrev.start,
+    left: touch.left && !touchPrev.left, right: touch.right && !touchPrev.right};
   touchPrev = {...touch};
 }
 function pollPads(){
@@ -321,8 +328,22 @@ const sameDev = (a,b) => a && b && a.type===b.type && (a.type==='pad' ? a.index=
 const devLabel = d => d.type==='pad' ? `コントローラー${d.index+1}` : d.type==='touch' ? 'タッチ操作' : KB[d.scheme].label;
 
 /* ---------- state ---------- */
-let hi = 0;
-try { hi = parseInt(localStorage.getItem('hoshizora-hi')||'0',10) || 0; } catch(e){}
+const HI_KEY = {normal:'hoshizora-hi', hard:'hoshizora-hi-hard'};
+const hiTable = {normal:0, hard:0};
+for (const k of Object.keys(HI_KEY)){
+  try { hiTable[k] = parseInt(localStorage.getItem(HI_KEY[k])||'0',10) || 0; } catch(e){}
+}
+let difficulty = 'normal';
+try { if (localStorage.getItem('hoshizora-mode') === 'hard') difficulty = 'hard'; } catch(e){}
+let hi = hiTable[difficulty];
+let reinfTimer = REINF_INTERVAL, reinfCount = 0, reinfTotal = 0;
+const MODE_LABEL = {normal:'ノーマル', hard:'ハード'};
+function toggleDifficulty(){
+  difficulty = difficulty === 'normal' ? 'hard' : 'normal';
+  hi = hiTable[difficulty];
+  try { localStorage.setItem('hoshizora-mode', difficulty); } catch(e){}
+  tone(difficulty === 'hard' ? 330 : 660, 0.08, 'square', 0.05);
+}
 const slots = [null,null,null,null];
 let mode = 'lobby', modeT = 0;
 let items = [];
@@ -383,9 +404,23 @@ function buildWave(){
   form = {x:(W-11*32)/2+6, y:72 + Math.min(wave-1,6)*12, dir:1, frame:0, step:0, timer:0.6};
   bombs = []; ufo = null; ufoTimer = 15 + Math.random()*10;
   bombTimer = 1.5;
+  reinfTimer = REINF_INTERVAL; reinfCount = 0;
 }
 const alienX = a => form.x + a.c*32;
-const alienY = a => form.y + a.r*28;
+const alienY = a => form.y + a.r*28 + (a.enter || 0);
+function callReinforcements(){
+  const slotsFree = aliens.filter(a => !a.alive && alienX(a) >= 16 && alienX(a) + 20 <= W - 16);
+  slotsFree.sort((a,b) => a.r - b.r || Math.random() - 0.5);
+  const pick = slotsFree.slice(0, REINF_COUNT);
+  if (!pick.length) return;
+  for (const a of pick){
+    const baseY = form.y + a.r*28;
+    a.alive = true; a.reinf = true; a.enter = -(baseY + 24);
+  }
+  reinfCount++; reinfTotal++;
+  texts.push({x:W/2, y:200, s:'援軍接近！', color:'#ff4f8b', t:1.6, big:true});
+  sfx.siren();
+}
 
 function startGame(){
   const joined = slots.map((d,i)=>d?i:-1).filter(i=>i>=0);
@@ -395,7 +430,7 @@ function startGame(){
     x: W*(k+1)/(joined.length+1) - 13, score:0, lives:3,
     alive:true, out:false, respawn:0, inv:1.5, bullets:[], hits:0, rapid:0, cool:0, shield:0
   }));
-  wave = 1; fx = []; texts = []; items = [];
+  wave = 1; fx = []; texts = []; items = []; reinfTotal = 0;
   makeBunkers(); buildWave();
   mode = 'play'; modeT = 0; sfx.start();
 }
@@ -404,12 +439,17 @@ function endGame(){
   mode = 'over'; modeT = 0;
   results = players.slice().sort((a,b)=>b.score-a.score);
   const top = results[0] ? results[0].score : 0;
-  if (top > hi){ hi = top; try { localStorage.setItem('hoshizora-hi', String(hi)); } catch(e){} }
+  if (top > hi){ hi = top; hiTable[difficulty] = top; try { localStorage.setItem(HI_KEY[difficulty], String(hi)); } catch(e){} }
 }
 
 function grantItem(p, type){
-  if (type === 'R'){ p.rapid = RAPID_TIME; texts.push({x:p.x+13, y:PLAYER_Y-24, s:'連射UP', color:ICOL.R, t:1.4}); }
-  else { p.shield = SHIELD_MAX; texts.push({x:p.x+13, y:PLAYER_Y-24, s:'バリア', color:ICOL.S, t:1.4}); }
+  if (type === 'R'){
+    p.rapid = Math.min(RAPID_CAP, p.rapid + RAPID_TIME);
+    texts.push({x:p.x+13, y:PLAYER_Y-24, s:`連射 ${Math.ceil(p.rapid)}秒`, color:ICOL.R, t:1.4});
+  } else {
+    p.shield = Math.min(SHIELD_CAP, p.shield + SHIELD_MAX);
+    texts.push({x:p.x+13, y:PLAYER_Y-24, s:`バリア ×${p.shield}`, color:ICOL.S, t:1.4});
+  }
   texts.push({x:p.x+13, y:PLAYER_Y-38, s:`${p.slot+1}P GET`, color:p.color, t:1.4});
   sfx.item();
 }
@@ -431,6 +471,10 @@ function update(dt){
     if (keyEdge.has('KeyW')) joinSlot({type:'kb', scheme:'kbB'});
     if (keyEdge.has('Enter')) joinSlot({type:'kb', scheme:'kbA'});
     if (touchEdge.fire || touchEdge.start) joinSlot({type:'touch'});
+    let flip = touchEdge.left || touchEdge.right ||
+      ['ArrowLeft','ArrowRight','KeyA','KeyD'].some(k=>keyEdge.has(k));
+    padNow.forEach((p,i)=>{ if (p && (padEdge(i,'left') || padEdge(i,'right'))) flip = true; });
+    if (flip) toggleDifficulty();
     if (keyEdge.has('Escape')) slots.fill(null);
     if (startPressed && slots.some(Boolean) && modeT > 0.3) startGame();
   }
@@ -554,6 +598,15 @@ function updatePlay(dt){
     }
   }
 
+  // reinforcements fly in
+  for (const a of aliens) if (a.enter < 0) a.enter = Math.min(0, a.enter + 260*dt);
+  if (difficulty === 'hard' && n > 0){
+    const before = Math.ceil(reinfTimer);
+    reinfTimer -= dt;
+    if (reinfTimer <= 5 && Math.ceil(reinfTimer) !== before && reinfTimer > 0) sfx.tick();
+    if (reinfTimer <= 0){ callReinforcements(); reinfTimer = REINF_INTERVAL; }
+  }
+
   // alien bombs
   const living = players.filter(p=>!p.out).length;
   bombTimer -= dt;
@@ -561,7 +614,7 @@ function updatePlay(dt){
     bombTimer = (0.35 + Math.random()*0.8) / (0.7 + 0.22*living) * speed;
     if (bombs.length < 3 + living){
       const cols = {};
-      for (const a of aliens) if (a.alive && (!cols[a.c] || a.r > cols[a.c].r)) cols[a.c] = a;
+      for (const a of aliens) if (a.alive && !(a.enter < 0) && (!cols[a.c] || a.r > cols[a.c].r)) cols[a.c] = a;
       const shooters = Object.values(cols);
       let pick = shooters[Math.floor(Math.random()*shooters.length)];
       const targets = players.filter(p=>p.alive);
@@ -657,8 +710,14 @@ function drawHUD(){
   }
   ctx.fillStyle = '#2b2645'; ctx.fillRect(0, 26, W, 1);
   ctx.fillStyle = '#3dff8f'; ctx.fillRect(0, GROUND, W, 2);
-  text(`WAVE ${wave}`, 12, 464, 12, '#8f8aab');
+  text(`WAVE ${wave}` + (difficulty === 'hard' ? '  HARD' : ''), 12, 464, 12, difficulty === 'hard' ? '#ff4f8b' : '#8f8aab');
   text(`HI ${pad5(hi)}`, W-12, 464, 12, '#8f8aab', 'right');
+  if (difficulty === 'hard' && mode !== 'clear' && mode !== 'over'){
+    const sec = Math.max(0, Math.ceil(reinfTimer));
+    const warn = sec <= 5;
+    const col = warn ? (Math.floor(clock*6)%2 ? '#ff4f8b' : '#eaf5ee') : '#8f8aab';
+    text(`援軍まで ${sec}`, W/2, 464, 12, col, 'center');
+  }
 }
 
 function drawPlay(){
@@ -667,7 +726,9 @@ function drawPlay(){
   ctx.fillStyle = '#ff9f43';
   for (const b of bunkers) for (let y=0;y<BH;y++) for (let x=0;x<BW;x++) if (b.cells[y*BW+x]) ctx.fillRect(b.x+x*2, b.y+y*2, 2, 2);
   // aliens
-  for (const a of aliens) if (a.alive) drawSpr(SPR[a.t][form.frame], ACOL[a.t], alienX(a), alienY(a));
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 28, W, H-28); ctx.clip();
+  for (const a of aliens) if (a.alive) drawSpr(SPR[a.t][form.frame], a.reinf ? '#ff9aa8' : ACOL[a.t], alienX(a), alienY(a));
+  ctx.restore();
   if (ufo) drawSpr(SPR.ufo, '#ff4f8b', ufo.x, 34);
   // bombs
   ctx.fillStyle = '#eaf5ee';
@@ -685,25 +746,29 @@ function drawPlay(){
     drawSpr(SPR.cannon, p.color, p.x, PLAYER_Y);
     if (p.shield > 0) drawShield(p);
     if (p.rapid > 0){
-      const w = 26 * (p.rapid / RAPID_TIME);
       ctx.fillStyle = (p.rapid < 3 && Math.floor(clock*8)%2) ? '#3a3555' : ICOL.R;
-      ctx.fillRect(p.x, PLAYER_Y+16, w, 2);
+      for (let k=0;k<3;k++){
+        const f = Math.max(0, Math.min(1, (p.rapid - k*RAPID_TIME) / RAPID_TIME));
+        if (f > 0) ctx.fillRect(p.x, PLAYER_Y+15+k*3, 26*f, 2);
+      }
     }
     text(`${p.slot+1}P`, p.x+13, GROUND+2, 10, p.color, 'center');
   }
   for (const it of items) drawItem(it);
   for (const f of fx) drawSpr(f.rows, f.color, f.x, f.y);
-  for (const t of texts) text(t.s, t.x, t.y, 12, t.color, 'center');
+  for (const t of texts) text(t.s, t.x, t.y, t.big ? 30 : 12, t.big && Math.floor(clock*8)%2 ? '#eaf5ee' : t.color, 'center');
   drawHUD();
 }
 
 function drawShield(p){
   const cx = p.x+13, cy = PLAYER_Y+10;
   ctx.strokeStyle = ICOL.S; ctx.lineWidth = 2;
-  ctx.globalAlpha = 0.45 + 0.2*p.shield + 0.1*Math.sin(clock*10);
+  ctx.globalAlpha = Math.min(1, 0.45 + 0.15*p.shield) * (0.9 + 0.1*Math.sin(clock*10));
   ctx.beginPath(); ctx.arc(cx, cy, 20, Math.PI*1.08, Math.PI*1.92); ctx.stroke();
   ctx.globalAlpha = 1;
-  for (let i=0;i<p.shield;i++){ ctx.fillStyle = ICOL.S; ctx.fillRect(cx-8+i*6, cy-24, 4, 2); }
+  const sx = cx - (p.shield*6 - 2)/2;
+  ctx.fillStyle = ICOL.S;
+  for (let i=0;i<p.shield;i++) ctx.fillRect(sx+i*6, cy-24, 4, 2);
 }
 function drawItem(it){
   const col = ICOL[it.type];
@@ -712,15 +777,27 @@ function drawItem(it){
   ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.strokeRect(it.x+1, it.y+1, 14, 12);
   text(ILETTER[it.type], it.x+8, it.y-1, 12, blink ? '#eaf5ee' : col, 'center');
 }
+function drawModeSelect(){
+  const y = 134, w = 120, h = 26;
+  [['normal','ノーマル','#3dff8f'],['hard','ハード','#ff4f8b']].forEach(([k,label,col],i)=>{
+    const x = W/2 - 130 + i*140, on = difficulty === k;
+    if (on){ ctx.fillStyle = k === 'hard' ? 'rgba(255,79,139,.16)' : 'rgba(61,255,143,.12)'; ctx.fillRect(x, y, w, h); }
+    ctx.strokeStyle = on ? col : '#2b2645'; ctx.lineWidth = 2; ctx.strokeRect(x+1, y+1, w-2, h-2);
+    text(label, x+w/2, y+3, 16, on ? col : '#6b6788', 'center');
+  });
+  const arrowCol = Math.floor(clock*2)%2 ? '#eaf5ee' : '#8f8aab';
+  text('◀', W/2-152, y+3, 16, arrowCol, 'center');
+  text('▶', W/2+152, y+3, 16, arrowCol, 'center');
+  const desc = difficulty === 'hard'
+    ? `${REINF_INTERVAL}秒以内に倒しきれないと援軍が来る`
+    : '昔ながらのルール';
+  text(`${desc}　／　左右で切替`, W/2, y+32, 12, '#8f8aab', 'center');
+}
 function drawLobby(){
   drawStars();
   text('ほしぞら防衛隊', W/2, 58, 40, '#eaf5ee', 'center');
   text('1–4 PLAYER SCORE BATTLE', W/2, 108, 14, '#ff9f43', 'center');
-  // sample formation
-  for (let c=0;c<6;c++){
-    const t = ['A','B','C'][c%3];
-    drawSpr(SPR[t][Math.floor(clock*2)%2], ACOL[t], W/2-100+c*34, 140);
-  }
+  drawModeSelect();
   for (let i=0;i<4;i++){
     const x = 22 + i*152, y = 188, w = 140, h = 150;
     const d = slots[i], col = PCOL[i];
@@ -747,8 +824,8 @@ function drawLobby(){
   drawSpr(SPR.B[0], ACOL.B, W/2-44, 424);  text('20', W/2-18, 424, 12, '#eaf5ee');
   drawSpr(SPR.C[0], ACOL.C, W/2+16, 424);  text('10', W/2+42, 424, 12, '#eaf5ee');
   drawSpr(SPR.ufo, '#ff4f8b', W/2+74, 425); text('???', W/2+112, 424, 12, '#eaf5ee');
-  drawItem({x:W/2-150, y:448, type:'R', ph:0}); text('連射UP（12秒）', W/2-128, 448, 12, '#eaf5ee');
-  drawItem({x:W/2+20, y:448, type:'S', ph:0}); text('バリア（3発まで防ぐ）', W/2+42, 448, 12, '#eaf5ee');
+  drawItem({x:W/2-150, y:448, type:'R', ph:0}); text('連射UP（+12秒）', W/2-128, 448, 12, '#eaf5ee');
+  drawItem({x:W/2+20, y:448, type:'S', ph:0}); text('バリア（+3発）', W/2+42, 448, 12, '#eaf5ee');
   text(`HI ${pad5(hi)}`, W-12, 464, 12, '#8f8aab', 'right');
 }
 
@@ -757,7 +834,7 @@ function overlay(alpha=0.6){ ctx.fillStyle = `rgba(8,7,15,${alpha})`; ctx.fillRe
 function drawOver(){
   drawPlay(); overlay(0.72);
   text('GAME OVER', W/2, 70, 40, '#ff4f8b', 'center');
-  text(`WAVE ${wave} まで到達`, W/2, 120, 14, '#8f8aab', 'center');
+  text(`${MODE_LABEL[difficulty]}モード ・ WAVE ${wave} まで到達` + (difficulty === 'hard' && reinfTotal ? ` ・ 援軍 ${reinfTotal}回` : ''), W/2, 120, 14, '#8f8aab', 'center');
   results.forEach((p,i)=>{
     const y = 168 + i*48;
     const win = i===0 && results.length>1;
