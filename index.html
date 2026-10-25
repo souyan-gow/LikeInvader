@@ -147,7 +147,7 @@ kbd{font-family:var(--f-display);font-size:12px;border:1px solid var(--line);bor
       </dl>
       <p class="note">全員で同じ敵を撃ち、スコアで競います。弾は1人1発ずつ。残機がなくなった人は脱落、全員脱落か敵が地上に届いたら終了です。</p>
       <p class="note">ときどき敵やUFOからアイテムが落ちてきます。撃ち当てた人がゲット。<b style="color:var(--amber)">R</b> は連射UP（同時3発、1個で+12秒・最大36秒）、<b style="color:var(--p3)">B</b> はバリア（1個で+3発・最大9発）。重ねて取るほど効果が積み上がります。</p>
-      <p class="note">ハードモードでは、25秒以内に編隊を倒しきれないと空いた場所に援軍が飛んできます。画面下の「援軍まで」の数字に注意。</p>
+      <p class="note">ハードモードでは、25秒以内に編隊を倒しきれないと空いた場所に援軍が飛んできます。画面下の「援軍まで」の数字に注意。そのかわり、ハードでは最初から画面に2発まで撃てて、アイテム（特に連射UP）も出やすくなっています。</p>
       <div class="chips" aria-hidden="true">
         <span class="chip" style="color:var(--p1)">1P</span><span class="chip" style="color:var(--p2)">2P</span><span class="chip" style="color:var(--p3)">3P</span><span class="chip" style="color:var(--p4)">4P</span>
       </div>
@@ -199,6 +199,10 @@ const ACOL = {A:'#d6c8ff', B:'#eef6f0', C:'#a8f0d8'};
 const ITEM_RATE = 0.07, RAPID_TIME = 12, SHIELD_MAX = 3;
 const RAPID_CAP = 36, SHIELD_CAP = 9;
 const REINF_INTERVAL = 25, REINF_COUNT = 11;
+// ハードモードの救済: 通常時でも画面に2発まで撃てる / アイテムが出やすく、連射が出やすい
+const HARD_BASE_SHOTS = 2, HARD_ITEM_RATE = 0.12, HARD_RAPID_SHARE = 0.65;
+const itemRate = () => difficulty === 'hard' ? HARD_ITEM_RATE : ITEM_RATE;
+const rollItem = () => Math.random() < (difficulty === 'hard' ? HARD_RAPID_SHARE : 0.5) ? 'R' : 'S';
 const ICOL = {R:'#ff9f43', S:'#47c8ff'};
 const ILETTER = {R:'R', S:'B'};
 const APTS = {A:30, B:20, C:10};
@@ -507,10 +511,10 @@ function updatePlay(dt){
       p.x = Math.max(8, Math.min(W-8-26, p.x + v*150*dt));
       p.rapid = Math.max(0, p.rapid - dt);
       p.cool = Math.max(0, p.cool - dt);
-      const maxB = p.rapid > 0 ? 3 : 1;
+      const maxB = p.rapid > 0 ? 3 : (difficulty === 'hard' ? HARD_BASE_SHOTS : 1);
       if (inp.fire && p.bullets.length < maxB && p.cool <= 0 && mode === 'play'){
         p.bullets.push({x: p.x+13, y: PLAYER_Y-8});
-        p.cool = p.rapid > 0 ? 0.12 : 0;
+        p.cool = p.rapid > 0 ? 0.12 : (difficulty === 'hard' ? 0.18 : 0);
         sfx.shoot();
       }
     }
@@ -531,7 +535,7 @@ function updatePlay(dt){
         if (b.x >= ax && b.x <= ax+20 && b.y <= ay+16 && b.y+8 >= ay){
           a.alive = false; gone = true; p.score += APTS[a.t]; p.hits++;
           fx.push({x:ax, y:ay, t:0.25, rows:SPR.boom, color:p.color});
-          if (Math.random() < ITEM_RATE) items.push({x:ax+2, y:ay, type: Math.random()<0.5?'R':'S', ph:0});
+          if (Math.random() < itemRate()) items.push({x:ax+2, y:ay, type: rollItem(), ph:0});
           sfx.hit(); break;
         }
       }
@@ -539,7 +543,7 @@ function updatePlay(dt){
         const pts = [50,100,150,300][Math.floor(Math.random()*4)];
         p.score += pts; texts.push({x:ufo.x+16, y:42, s:String(pts), color:p.color, t:1.2});
         fx.push({x:ufo.x+6, y:34, t:0.4, rows:SPR.boom, color:p.color});
-        items.push({x:ufo.x+8, y:40, type: Math.random()<0.5?'R':'S', ph:0});
+        items.push({x:ufo.x+8, y:40, type: rollItem(), ph:0});
         ufo = null; gone = true; sfx.ufoHit();
       }
       if (!gone){
@@ -789,7 +793,7 @@ function drawModeSelect(){
   text('◀', W/2-152, y+3, 16, arrowCol, 'center');
   text('▶', W/2+152, y+3, 16, arrowCol, 'center');
   const desc = difficulty === 'hard'
-    ? `${REINF_INTERVAL}秒以内に倒しきれないと援軍が来る`
+    ? `${REINF_INTERVAL}秒で援軍　2発同時撃ち・アイテム多め`
     : '昔ながらのルール';
   text(`${desc}　／　左右で切替`, W/2, y+32, 12, '#8f8aab', 'center');
 }
